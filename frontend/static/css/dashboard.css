@@ -1,0 +1,395 @@
+/* Binance Volatility Strategy Dashboard Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 400px;
+}
+
+.modal-content h2 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #1e3c72;
+}
+
+.input-group {
+    margin-bottom: 1rem;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #2a5298;
+}
+
+button {
+    width: 100%;
+    padding: 0.75rem;
+    background: #2a5298;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background: #1e3c72;
+}
+
+/* Dashboard Styles */
+.dashboard-header {
+    background: rgba(255,255,255,0.95);
+    padding: 1rem 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-content h1 {
+    color: #1e3c72;
+    font-size: 1.8rem;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logout-btn {
+    width: auto;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+/* Status Bar */
+.status-bar {
+    background: rgba(255,255,255,0.9);
+    padding: 1rem 0;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.status-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.status-value {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #1e3c72;
+}
+
+/* Main Content */
+.main-content {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.card {
+    background: rgba(255,255,255,0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.card h3 {
+    color: #1e3c72;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+/* Portfolio Overview */
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.portfolio-stat {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(42, 82, 152, 0.1);
+    border-radius: 10px;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #1e3c72;
+}
+
+/* LTV Monitor */
+.ltv-monitor {
+    text-align: center;
+}
+
+.ltv-gauge {
+    margin: 1rem 0;
+}
+
+.ltv-ranges {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.range {
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.range.safe { background: #d4edda; color: #155724; }
+.range.target { background: #fff3cd; color: #856404; }
+.range.danger { background: #f8d7da; color: #721c24; }
+.range.critical { background: #f5c6cb; color: #721c24; }
+
+/* Controls */
+.control-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.btn {
+    width: auto;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.btn-success { background: #28a745; }
+.btn-warning { background: #ffc107; color: #212529; }
+.btn-primary { background: #007bff; }
+.btn-danger { background: #dc3545; }
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.initialization {
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+}
+
+.initialization .input-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.initialization input {
+    width: auto;
+    flex: 1;
+}
+
+.initialization button {
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Transactions */
+.transactions-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.transaction-item:hover {
+    background: rgba(42, 82, 152, 0.05);
+}
+
+.transaction-type {
+    font-weight: bold;
+    color: #1e3c72;
+}
+
+.transaction-amount {
+    font-family: 'Courier New', monospace;
+}
+
+.transaction-time {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+/* Alerts */
+.alerts-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 5px;
+    border-left: 4px solid;
+}
+
+.alert-item.info { border-color: #17a2b8; background: rgba(23, 162, 184, 0.1); }
+.alert-item.warning { border-color: #ffc107; background: rgba(255, 193, 7, 0.1); }
+.alert-item.error { border-color: #dc3545; background: rgba(220, 53, 69, 0.1); }
+.alert-item.critical { border-color: #721c24; background: rgba(114, 28, 36, 0.1); }
+
+.alert-title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.alert-message {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.alert-time {
+    font-size: 0.8rem;
+    color: #999;
+    margin-top: 0.25rem;
+}
+
+/* Loading States */
+.loading {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 2rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .status-bar {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .main-content {
+        grid-template-columns: 1fr;
+        padding: 0 1rem;
+    }
+
+    .portfolio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .control-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .initialization .input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
+.card:nth-child(4) { animation-delay: 0.4s; }
+.card:nth-child(5) { animation-delay: 0.5s; }

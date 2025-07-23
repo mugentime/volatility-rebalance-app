@@ -1,0 +1,11 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[variables]
+PYTHON_VERSION = "3.9"
