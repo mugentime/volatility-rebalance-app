@@ -39,3 +39,6 @@ gunicorn==20.1.0
 
 # Email
 email-validator==2.0.0
+
+Flask-HTTPAuth==4.8.0
+
