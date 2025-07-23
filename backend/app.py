@@ -1,186 +1,117 @@
-import logging
-from decimal import Decimal
-from datetime import datetime
 import os
-from ..models.database import db, Transaction
+import sys
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
+from flask_httpauth import HTTPBasicAuth
+from apscheduler.schedulers.background import BackgroundScheduler
+import logging
+from datetime import datetime
+import atexit
 
-class StrategyEngine:
-    def __init__(self, binance_client):
-        self.client = binance_client
-        self.max_ltv = float(os.getenv('MAX_LTV_RATIO', '0.65'))
-        self.target_ltv = float(os.getenv('TARGET_LTV_RATIO', '0.60'))
-        self.min_ltv = float(os.getenv('MIN_LTV_RATIO', '0.55'))
-        self.emergency_threshold = float(os.getenv('EMERGENCY_LTV_THRESHOLD', '0.75'))
-        self.is_running = False
+# Add the project root to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-    def initialize_strategy(self):
-        """Initialize the ETH-SOL volatility strategy"""
-        try:
-            logging.info("Initializing ETH-SOL volatility strategy")
-            
-            # Get current balances
-            portfolio = self.client.get_portfolio_summary()
-            total_value = portfolio['total_value_usd']
-            
-            if total_value < 100:  # Minimum balance check
-                return {'error': 'Insufficient balance to start strategy'}
-            
-            # Split capital 50/50 between ETH and SOL
-            target_eth_value = total_value * 0.5
-            target_sol_value = total_value * 0.5
-            
-            eth_price = portfolio['prices']['ETH']
-            sol_price = portfolio['prices']['SOL']
-            
-            target_eth_amount = target_eth_value / eth_price
-            target_sol_amount = target_sol_value / sol_price
-            
-            # Execute trades to achieve target allocation
-            self._rebalance_portfolio(target_eth_amount, target_sol_amount)
-            
-            # Subscribe to earn products
-            self._subscribe_to_earn_products()
-            
-            self.is_running = True
-            
-            return {
-                'status': 'success',
-                'message': 'Strategy initialized successfully',
-                'target_allocation': {
-                    'ETH': target_eth_amount,
-                    'SOL': target_sol_amount
-                }
-            }
-            
-        except Exception as e:
-            logging.error(f"Strategy initialization failed: {e}")
-            return {'error': str(e)}
+# Use absolute imports instead of relative imports
+from backend.services.binance_client import BinanceClient
+from backend.services.strategy_engine import StrategyEngine  
+from backend.models.database import db, User, Transaction
 
-    def run_strategy_cycle(self):
-        """Main strategy execution cycle"""
-        if not self.is_running:
-            return
-            
-        try:
-            logging.info("Running strategy cycle")
-            
-            # Calculate current LTV
-            ltv_data = self.calculate_current_ltv()
-            current_ltv = ltv_data.get('current_ltv', 0)
-            
-            # Emergency check
-            if current_ltv >= self.emergency_threshold:
-                logging.warning(f"Emergency LTV threshold reached: {current_ltv}")
-                self.emergency_unwind()
-                return
-            
-            # Rebalancing logic
-            if current_ltv > self.max_ltv:
-                self._reduce_leverage()
-            elif current_ltv < self.min_ltv:
-                self._increase_leverage()
-            
-            # Harvest earn rewards
-            self._harvest_and_reinvest_rewards()
-            
-        except Exception as e:
-            logging.error(f"Strategy cycle failed: {e}")
+app = Flask(__name__)
+CORS(app)
+auth = HTTPBasicAuth()
 
-    def calculate_current_ltv(self):
-        """Calculate current loan-to-value ratio"""
-        try:
-            portfolio = self.client.get_portfolio_summary()
-            
-            # Get collateral value (assets in earn + spot)
-            eth_balance = portfolio['spot_balances'].get('ETH', {}).get('total', 0)
-            sol_balance = portfolio['spot_balances'].get('SOL', {}).get('total', 0)
-            
-            eth_earn = portfolio['earn_balances'].get('ETH', 0)
-            sol_earn = portfolio['earn_balances'].get('SOL', 0)
-            
-            total_eth = eth_balance + eth_earn
-            total_sol = sol_balance + sol_earn
-            
-            collateral_value = (total_eth * portfolio['prices']['ETH'] + 
-                              total_sol * portfolio['prices']['SOL'])
-            
-            # For this example, assume we have loan data
-            # In practice, you'd fetch this from Binance Loans API
-            borrowed_value = 0  # This would be calculated from actual loans
-            
-            current_ltv = borrowed_value / collateral_value if collateral_value > 0 else 0
-            
-            return {
-                'current_ltv': current_ltv,
-                'collateral_value': collateral_value,
-                'borrowed_value': borrowed_value,
-                'max_ltv': self.max_ltv,
-                'target_ltv': self.target_ltv
-            }
-            
-        except Exception as e:
-            logging.error(f"LTV calculation failed: {e}")
-            return {'current_ltv': 0, 'error': str(e)}
+# Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///binance_strategy.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    def emergency_unwind(self):
-        """Emergency position unwinding"""
-        try:
-            logging.info("Executing emergency unwind")
-            self.is_running = False
-            
-            # Redeem all earn positions
-            self._redeem_all_earn_positions()
-            
-            # Repay all loans (implementation would depend on loan structure)
-            # This is a placeholder for the actual loan repayment logic
-            
-            return {'status': 'success', 'message': 'Emergency unwind completed'}
-            
-        except Exception as e:
-            logging.error(f"Emergency unwind failed: {e}")
-            return {'error': str(e)}
+# Initialize database
+db.init_app(app)
 
-    def _rebalance_portfolio(self, target_eth, target_sol):
-        """Rebalance portfolio to target allocation"""
-        # Implementation for portfolio rebalancing
-        pass
+# Initialize services
+binance_client = BinanceClient()
+strategy_engine = StrategyEngine(binance_client)
 
-    def _subscribe_to_earn_products(self):
-        """Subscribe assets to earn products"""
-        # Implementation for earn product subscription
-        pass
+# Authentication
+@auth.verify_password
+def authenticate(username, password):
+    return (username == os.getenv('BASIC_AUTH_USERNAME', 'admin') and 
+            password == os.getenv('BASIC_AUTH_PASSWORD', 'password'))
 
-    def _reduce_leverage(self):
-        """Reduce leverage when LTV is too high"""
-        # Implementation for leverage reduction
-        pass
+# Background scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=strategy_engine.run_strategy_cycle,
+    trigger="interval",
+    minutes=int(os.getenv('SCHEDULER_INTERVAL', 5)),
+    id='strategy_cycle'
+)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
 
-    def _increase_leverage(self):
-        """Increase leverage when LTV is too low"""
-        # Implementation for leverage increase
-        pass
+@app.route('/')
+@auth.login_required
+def dashboard():
+    return render_template_string(open('frontend/index.html').read())
 
-    def _harvest_and_reinvest_rewards(self):
-        """Harvest earn rewards and reinvest"""
-        # Implementation for reward harvesting
-        pass
+@app.route('/api/portfolio')
+@auth.login_required
+def get_portfolio():
+    try:
+        portfolio = binance_client.get_portfolio_summary()
+        return jsonify(portfolio)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    def _redeem_all_earn_positions(self):
-        """Redeem all earn positions for emergency exit"""
-        # Implementation for position redemption
-        pass
+@app.route('/api/ltv')
+@auth.login_required
+def get_ltv():
+    try:
+        ltv_data = strategy_engine.calculate_current_ltv()
+        return jsonify(ltv_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    def _log_transaction(self, tx_type, asset, amount, status='completed'):
-        """Log transaction to database"""
-        try:
-            transaction = Transaction(
-                transaction_type=tx_type,
-                asset=asset,
-                amount=Decimal(str(amount)),
-                status=status,
-                timestamp=datetime.utcnow()
-            )
-            db.session.add(transaction)
-            db.session.commit()
-        except Exception as e:
-            logging.error(f"Failed to log transaction: {e}")
+@app.route('/api/start_strategy', methods=['POST'])
+@auth.login_required
+def start_strategy():
+    try:
+        result = strategy_engine.initialize_strategy()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stop_strategy', methods=['POST'])
+@auth.login_required
+def stop_strategy():
+    try:
+        result = strategy_engine.emergency_unwind()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/transactions')
+@auth.login_required
+def get_transactions():
+    try:
+        transactions = Transaction.query.order_by(Transaction.timestamp.desc()).limit(50).all()
+        return jsonify([{
+            'id': t.id,
+            'type': t.transaction_type,
+            'asset': t.asset,
+            'amount': float(t.amount),
+            'timestamp': t.timestamp.isoformat(),
+            'status': t.status
+        } for t in transactions])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    port = int(os.getenv('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
