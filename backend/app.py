@@ -1,115 +1,186 @@
-#!/usr/bin/env python3
-"""
-Binance Volatility Strategy Web Application
-Main Flask application entry point
-"""
-
-import os
 import logging
-from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from werkzeug.security import check_password_hash, generate_password_hash
-from apscheduler.schedulers.background import BackgroundScheduler
-import atexit
+from decimal import Decimal
+from datetime import datetime
+import os
+from ..models.database import db, Transaction
 
-# Import custom modules
-from backend.services.binance_client import BinanceClient
-from backend.services.strategy_engine import StrategyEngine
-from backend.models.database import db, User, Portfolio, Transaction
-from backend.routes.api_routes import api_bp
-from backend.utils.auth import auth_required
-from config.settings import Config
+class StrategyEngine:
+    def __init__(self, binance_client):
+        self.client = binance_client
+        self.max_ltv = float(os.getenv('MAX_LTV_RATIO', '0.65'))
+        self.target_ltv = float(os.getenv('TARGET_LTV_RATIO', '0.60'))
+        self.min_ltv = float(os.getenv('MIN_LTV_RATIO', '0.55'))
+        self.emergency_threshold = float(os.getenv('EMERGENCY_LTV_THRESHOLD', '0.75'))
+        self.is_running = False
 
-# Initialize Flask app
-app = Flask(__name__)
-app.config.from_object(Config)
+    def initialize_strategy(self):
+        """Initialize the ETH-SOL volatility strategy"""
+        try:
+            logging.info("Initializing ETH-SOL volatility strategy")
+            
+            # Get current balances
+            portfolio = self.client.get_portfolio_summary()
+            total_value = portfolio['total_value_usd']
+            
+            if total_value < 100:  # Minimum balance check
+                return {'error': 'Insufficient balance to start strategy'}
+            
+            # Split capital 50/50 between ETH and SOL
+            target_eth_value = total_value * 0.5
+            target_sol_value = total_value * 0.5
+            
+            eth_price = portfolio['prices']['ETH']
+            sol_price = portfolio['prices']['SOL']
+            
+            target_eth_amount = target_eth_value / eth_price
+            target_sol_amount = target_sol_value / sol_price
+            
+            # Execute trades to achieve target allocation
+            self._rebalance_portfolio(target_eth_amount, target_sol_amount)
+            
+            # Subscribe to earn products
+            self._subscribe_to_earn_products()
+            
+            self.is_running = True
+            
+            return {
+                'status': 'success',
+                'message': 'Strategy initialized successfully',
+                'target_allocation': {
+                    'ETH': target_eth_amount,
+                    'SOL': target_sol_amount
+                }
+            }
+            
+        except Exception as e:
+            logging.error(f"Strategy initialization failed: {e}")
+            return {'error': str(e)}
 
-# Initialize extensions
-db.init_app(app)
-CORS(app)
-jwt = JWTManager(app)
+    def run_strategy_cycle(self):
+        """Main strategy execution cycle"""
+        if not self.is_running:
+            return
+            
+        try:
+            logging.info("Running strategy cycle")
+            
+            # Calculate current LTV
+            ltv_data = self.calculate_current_ltv()
+            current_ltv = ltv_data.get('current_ltv', 0)
+            
+            # Emergency check
+            if current_ltv >= self.emergency_threshold:
+                logging.warning(f"Emergency LTV threshold reached: {current_ltv}")
+                self.emergency_unwind()
+                return
+            
+            # Rebalancing logic
+            if current_ltv > self.max_ltv:
+                self._reduce_leverage()
+            elif current_ltv < self.min_ltv:
+                self._increase_leverage()
+            
+            # Harvest earn rewards
+            self._harvest_and_reinvest_rewards()
+            
+        except Exception as e:
+            logging.error(f"Strategy cycle failed: {e}")
 
-# Register blueprints
-app.register_blueprint(api_bp, url_prefix='/api')
+    def calculate_current_ltv(self):
+        """Calculate current loan-to-value ratio"""
+        try:
+            portfolio = self.client.get_portfolio_summary()
+            
+            # Get collateral value (assets in earn + spot)
+            eth_balance = portfolio['spot_balances'].get('ETH', {}).get('total', 0)
+            sol_balance = portfolio['spot_balances'].get('SOL', {}).get('total', 0)
+            
+            eth_earn = portfolio['earn_balances'].get('ETH', 0)
+            sol_earn = portfolio['earn_balances'].get('SOL', 0)
+            
+            total_eth = eth_balance + eth_earn
+            total_sol = sol_balance + sol_earn
+            
+            collateral_value = (total_eth * portfolio['prices']['ETH'] + 
+                              total_sol * portfolio['prices']['SOL'])
+            
+            # For this example, assume we have loan data
+            # In practice, you'd fetch this from Binance Loans API
+            borrowed_value = 0  # This would be calculated from actual loans
+            
+            current_ltv = borrowed_value / collateral_value if collateral_value > 0 else 0
+            
+            return {
+                'current_ltv': current_ltv,
+                'collateral_value': collateral_value,
+                'borrowed_value': borrowed_value,
+                'max_ltv': self.max_ltv,
+                'target_ltv': self.target_ltv
+            }
+            
+        except Exception as e:
+            logging.error(f"LTV calculation failed: {e}")
+            return {'current_ltv': 0, 'error': str(e)}
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+    def emergency_unwind(self):
+        """Emergency position unwinding"""
+        try:
+            logging.info("Executing emergency unwind")
+            self.is_running = False
+            
+            # Redeem all earn positions
+            self._redeem_all_earn_positions()
+            
+            # Repay all loans (implementation would depend on loan structure)
+            # This is a placeholder for the actual loan repayment logic
+            
+            return {'status': 'success', 'message': 'Emergency unwind completed'}
+            
+        except Exception as e:
+            logging.error(f"Emergency unwind failed: {e}")
+            return {'error': str(e)}
 
-# Initialize strategy engine
-strategy_engine = StrategyEngine()
+    def _rebalance_portfolio(self, target_eth, target_sol):
+        """Rebalance portfolio to target allocation"""
+        # Implementation for portfolio rebalancing
+        pass
 
-# Background scheduler for automation
-scheduler = BackgroundScheduler()
-scheduler.add_job(
-    func=strategy_engine.run_automation_cycle,
-    trigger="interval",
-    minutes=5,
-    id='strategy_automation'
-)
+    def _subscribe_to_earn_products(self):
+        """Subscribe assets to earn products"""
+        # Implementation for earn product subscription
+        pass
 
-@app.route('/')
-def index():
-    """Serve the main dashboard"""
-    return render_template('dashboard.html')
+    def _reduce_leverage(self):
+        """Reduce leverage when LTV is too high"""
+        # Implementation for leverage reduction
+        pass
 
-@app.route('/healthz')
-def health_check():
-    """Health check endpoint for Railway"""
-    return jsonify({"status": "healthy", "timestamp": str(datetime.utcnow())})
+    def _increase_leverage(self):
+        """Increase leverage when LTV is too low"""
+        # Implementation for leverage increase
+        pass
 
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    """User authentication endpoint"""
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    def _harvest_and_reinvest_rewards(self):
+        """Harvest earn rewards and reinvest"""
+        # Implementation for reward harvesting
+        pass
 
-    user = User.query.filter_by(username=username).first()
+    def _redeem_all_earn_positions(self):
+        """Redeem all earn positions for emergency exit"""
+        # Implementation for position redemption
+        pass
 
-    if user and check_password_hash(user.password_hash, password):
-        access_token = create_access_token(identity=username)
-        return jsonify({
-            'access_token': access_token,
-            'user_id': user.id
-        }), 200
-
-    return jsonify({'message': 'Invalid credentials'}), 401
-
-@app.route('/api/portfolio/status')
-@jwt_required()
-def portfolio_status():
-    """Get current portfolio status"""
-    user_id = get_jwt_identity()
-    portfolio = Portfolio.query.filter_by(user_id=user_id).first()
-
-    if not portfolio:
-        return jsonify({'error': 'Portfolio not found'}), 404
-
-    return jsonify({
-        'total_value': float(portfolio.total_value),
-        'eth_balance': float(portfolio.eth_balance),
-        'sol_balance': float(portfolio.sol_balance),
-        'current_ltv': float(portfolio.current_ltv),
-        'status': portfolio.status,
-        'last_updated': portfolio.last_updated.isoformat()
-    })
-
-@app.before_first_request
-def create_tables():
-    """Create database tables"""
-    db.create_all()
-
-if __name__ == '__main__':
-    # Start the scheduler
-    scheduler.start()
-    atexit.register(lambda: scheduler.shutdown())
-
-    # Run the app
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    def _log_transaction(self, tx_type, asset, amount, status='completed'):
+        """Log transaction to database"""
+        try:
+            transaction = Transaction(
+                transaction_type=tx_type,
+                asset=asset,
+                amount=Decimal(str(amount)),
+                status=status,
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(transaction)
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"Failed to log transaction: {e}")
