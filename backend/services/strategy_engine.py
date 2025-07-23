@@ -4,15 +4,10 @@ Handles automated portfolio management, LTV monitoring, and risk management
 """
 
 import logging
-import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from backend.services.binance_client import BinanceClient
-from backend.models.database import db, Portfolio, Transaction, User
-from backend.utils.calculations import calculate_ltv, calculate_optimal_allocation
-from backend.utils.notifications import send_alert
-
-logger = logging.getLogger(__name__)
+from decimal import Decimal
+from datetime import datetime
+import os
+from backend.models.database import db, Transaction
 
 class StrategyEngine:
     """Main strategy automation engine"""
