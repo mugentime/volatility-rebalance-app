@@ -13,7 +13,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our modules
 from backend.services.binance_client import BinanceClient
-from backend.services.strategy_engine import StrategyEngine  
+from backend.services.strategy_engine import StrategyEngine
+  
 from backend.models.database import db, User, Transaction, StrategyState
 
 # Configure logging
