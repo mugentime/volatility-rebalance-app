@@ -1,15 +1,14 @@
-def _log_transaction(self, tx_type, asset, amount, status='completed', extra_info=None):
-    """Log transaction to database"""
-    try:
-        transaction = Transaction(
-            transaction_type=tx_type,
-            asset=asset,
-            amount=str(amount),  # Store as string
-            status=status,
-            timestamp=datetime.utcnow(),
-            extra_data=extra_info  # Changed from metadata to extra_data
-        )
-        db.session.add(transaction)
-        db.session.commit()
-    except Exception as e:
-        logging.error(f"Failed to log transaction: {e}")
+# backend/services/strategy_engine.py
+
+class StrategyEngine:
+    def __init__(self):
+        # Initialize your strategy engine here
+        pass
+
+    def run(self):
+        # Implement the main behavior of the strategy engine here
+        print("StrategyEngine is running.")
+
+def _log_transaction(transaction):
+    # Placeholder for transaction logging logic
+    print(f"Transaction logged: {transaction}")
